@@ -8,29 +8,45 @@ from pelican import signals
 
 
 def is_published(article):
-    """ Return if article is published"""
     return getattr(article, 'status', 'published') == 'published'
 
 
 def get_articles(generator):
-    skip_articles = generator.settings.get('SKIP_ARTICLES', 0)
     articles = generator.context['articles']
-    return articles[skip_articles:]
+    published_articles = filter(is_published, articles)
+    skip_articles = generator.settings.get('SKIP_ARTICLES', 0)
+    return published_articles[skip_articles:]
+
+
+class RandomArticles(object):
+    "This class should inject a `random_articles` in a context."
+
+    def __init__(self, generator, metadata=None):
+        self.generator = generator
+        self.metadata = metadata
+        self.settings = generator.settings
+
+    def inject_articles(self):
+        """ Inject `random_articles` in generator context """
+        self.generator.context['random_articles'] = self.get_random_articles()
+
+    def get_random_articles(self):
+        """ Get random articles following settings configuration """
+        all_articles = get_articles(self.generator)
+        random_articles_number = self.settings.get('RANDOM_ARTICLES', 3)
+
+        articles_number = len(all_articles)
+
+        # we should return only articles number that exists
+        random_number = random_articles_number
+        if articles_number < random_articles_number:
+            random_number = articles_number
+
+        return random.sample(all_articles, random_number)
 
 
 def register_articles(generator, metadata):
-    articles = filter(is_published, get_articles(generator))
-    articles_number = len(articles)
-
-    random_articles_number = generator.settings.get('RANDOM_ARTICLES', 3)
-
-    # we should return only articles number that exists
-    sample_number = random_articles_number
-    if articles_number < random_articles_number:
-        sample_number = articles_number
-
-    random_articles = random.sample(articles, sample_number)
-    generator.context['random_articles'] = random_articles
+    RandomArticles(generator, metadata).inject_articles()
 
 
 def register():
